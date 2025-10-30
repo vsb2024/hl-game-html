@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎃 Halloween Candy Rush</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1a0033 0%, #330066 50%, #1a0033 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin: 20px 0;
+            text-shadow: 3px 3px 6px rgba(255, 140, 0, 0.5);
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { text-shadow: 3px 3px 6px rgba(255, 140, 0, 0.5); }
+            to { text-shadow: 3px 3px 20px rgba(255, 140, 0, 0.9); }
+        }
+
+        #gameInfo {
+            display: flex;
+            gap: 40px;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 3px solid #ff8c00;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 0 30px rgba(255, 140, 0, 0.5);
+        }
+
+        .entity {
+            position: absolute;
+            font-size: 40px;
+            transition: left 0.1s linear, top 0.1s linear;
+        }
+
+        #player {
+            bottom: 20px;
+            z-index: 10;
+        }
+
+        .candy {
+            animation: fall linear;
+            z-index: 5;
+        }
+
+        @keyframes fall {
+            from { top: -50px; }
+            to { top: 650px; }
+        }
+
+        .enemy {
+            animation: enemyMove linear;
+            z-index: 5;
+        }
+
+        @keyframes enemyMove {
+            0% {
+                top: -50px;
+                transform: translateX(0);
+            }
+            50% {
+                transform: translateX(30px);
+            }
+            100% {
+                top: 650px;
+                transform: translateX(0);
+            }
+        }
+
+        /* Game Over Modal */
+        #gameOverModal {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 40px;
+            border-radius: 20px;
+            border: 3px solid #ff8c00;
+            text-align: center;
+            z-index: 100;
+            box-shadow: 0 0 50px rgba(255, 140, 0, 0.8);
+        }
+
+        #gameOverModal h2 {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            color: #ff8c00;
+        }
+
+        #gameOverModal p {
+            font-size: 1.5rem;
+            margin-bottom: 30px;
+        }
+
+        #playAgainBtn {
+            font-size: 1.5rem;
+            padding: 15px 40px;
+            background: #ff8c00;
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        #playAgainBtn:hover {
+            background: #ffa500;
+            transform: scale(1.1);
+        }
+
+        /* Instructions */
+        #instructions {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 1rem;
+            opacity: 0.8;
+        }
+
+        /* Particles background effect */
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(180deg); }
+        }
+
+        .particle {
+            position: fixed;
+            font-size: 20px;
+            opacity: 0.3;
+            animation: float 6s ease-in-out infinite;
+            pointer-events: none;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎃 Halloween Candy Rush</h1>
+
+    <div id="gameInfo">
+        <div>Score: <span id="score">0</span></div>
+        <div>Lives: <span id="lives">❤️❤️❤️</span></div>
+    </div>
+
+    <div id="gameContainer">
+        <div id="player" class="entity">🎃</div>
+
+        <div id="gameOverModal">
+            <h2>Happy Halloween! 🎃</h2>
+            <p>Your score: <span id="finalScore">0</span></p>
+            <button id="playAgainBtn">Play Again 👻</button>
+        </div>
+    </div>
+
+    <div id="instructions">
+        Use ← → arrow keys to move • Collect candies 🍬 • Avoid ghosts 👻 and bats 🦇
+    </div>
+
+    <script>
+        // Game state
+        const gameState = {
+            score: 0,
+            lives: 3,
+            playerX: 380,
+            playerSpeed: 15,
+            gameRunning: true,
+            entities: [],
+            entityIdCounter: 0,
+            spawnInterval: 1500,  // milliseconds between spawns
+            candySpeed: 3,
+            enemySpeed: 2.5,
+            difficultyTimer: 0
+        };
+
+        // DOM elements
+        const player = document.getElementById('player');
+        const gameContainer = document.getElementById('gameContainer');
+        const scoreDisplay = document.getElementById('score');
+        const livesDisplay = document.getElementById('lives');
+        const gameOverModal = document.getElementById('gameOverModal');
+        const finalScoreDisplay = document.getElementById('finalScore');
+        const playAgainBtn = document.getElementById('playAgainBtn');
+
+        // Keyboard state
+        const keys = {};
+
+        // Initialize game
+        function init() {
+            createBackgroundParticles();
+            updatePlayerPosition();
+            startSpawning();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Create floating background particles
+        function createBackgroundParticles() {
+            const particles = ['👻', '🦇', '🎃', '🍬'];
+            for (let i = 0; i < 15; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.textContent = particles[Math.floor(Math.random() * particles.length)];
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.top = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 6 + 's';
+                document.body.appendChild(particle);
+            }
+        }
+
+        // Player movement
+        function updatePlayerPosition() {
+            player.style.left = gameState.playerX + 'px';
+        }
+
+        function movePlayer() {
+            if (keys['ArrowLeft'] && gameState.playerX > 0) {
+                gameState.playerX -= gameState.playerSpeed;
+            }
+            if (keys['ArrowRight'] && gameState.playerX < 760) {
+                gameState.playerX += gameState.playerSpeed;
+            }
+            updatePlayerPosition();
+        }
+
+        // Keyboard event handlers
+        window.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        // Spawn entities (candies and enemies)
+        function spawnEntity() {
+            if (!gameState.gameRunning) return;
+
+            const isCandy = Math.random() > 0.35;  // 65% chance for candy
+            const entity = {
+                id: gameState.entityIdCounter++,
+                type: isCandy ? 'candy' : 'enemy',
+                x: Math.random() * 760,
+                y: -50,
+                element: null
+            };
+
+            // Create DOM element
+            const div = document.createElement('div');
+            div.className = 'entity ' + entity.type;
+            div.textContent = isCandy ? '🍬' : (Math.random() > 0.5 ? '👻' : '🦇');
+            div.style.left = entity.x + 'px';
+            div.style.top = entity.y + 'px';
+
+            // Set animation duration based on speed
+            const duration = isCandy ?
+                (700 / gameState.candySpeed) :
+                (700 / gameState.enemySpeed);
+            div.style.animationDuration = duration + 's';
+
+            gameContainer.appendChild(div);
+            entity.element = div;
+            gameState.entities.push(entity);
+
+            // Remove entity after animation
+            setTimeout(() => {
+                if (entity.element && entity.element.parentNode) {
+                    entity.element.remove();
+                }
+                gameState.entities = gameState.entities.filter(e => e.id !== entity.id);
+            }, duration * 1000);
+        }
+
+        // Start spawning entities
+        function startSpawning() {
+            setInterval(() => {
+                if (gameState.gameRunning) {
+                    spawnEntity();
+                }
+            }, gameState.spawnInterval);
+        }
+
+        // Collision detection
+        function checkCollisions() {
+            const playerRect = {
+                left: gameState.playerX,
+                right: gameState.playerX + 40,
+                top: 560,
+                bottom: 600
+            };
+
+            gameState.entities.forEach(entity => {
+                if (!entity.element) return;
+
+                const rect = entity.element.getBoundingClientRect();
+                const containerRect = gameContainer.getBoundingClientRect();
+
+                const entityRect = {
+                    left: rect.left - containerRect.left,
+                    right: rect.right - containerRect.left,
+                    top: rect.top - containerRect.top,
+                    bottom: rect.bottom - containerRect.top
+                };
+
+                // Check overlap
+                if (playerRect.left < entityRect.right &&
+                    playerRect.right > entityRect.left &&
+                    playerRect.top < entityRect.bottom &&
+                    playerRect.bottom > entityRect.top) {
+
+                    handleCollision(entity);
+                }
+            });
+        }
+
+        // Handle collision with entity
+        function handleCollision(entity) {
+            if (!entity.element || !entity.element.parentNode) return;
+
+            if (entity.type === 'candy') {
+                // Collected candy
+                gameState.score++;
+                updateScore();
+                entity.element.remove();
+                gameState.entities = gameState.entities.filter(e => e.id !== entity.id);
+            } else {
+                // Hit by enemy
+                gameState.lives--;
+                updateLives();
+                entity.element.remove();
+                gameState.entities = gameState.entities.filter(e => e.id !== entity.id);
+
+                // Flash effect
+                player.style.opacity = '0.3';
+                setTimeout(() => { player.style.opacity = '1'; }, 200);
+
+                if (gameState.lives <= 0) {
+                    gameOver();
+                }
+            }
+        }
+
+        // Update score display
+        function updateScore() {
+            scoreDisplay.textContent = gameState.score;
+        }
+
+        // Update lives display
+        function updateLives() {
+            livesDisplay.textContent = '❤️'.repeat(gameState.lives);
+        }
+
+        // Increase difficulty over time
+        function increaseDifficulty(deltaTime) {
+            gameState.difficultyTimer += deltaTime;
+
+            // Every 10 seconds, increase speed slightly
+            if (gameState.difficultyTimer > 10000) {
+                gameState.candySpeed = Math.min(gameState.candySpeed + 0.2, 6);
+                gameState.enemySpeed = Math.min(gameState.enemySpeed + 0.2, 5);
+                gameState.spawnInterval = Math.max(gameState.spawnInterval - 100, 800);
+                gameState.difficultyTimer = 0;
+            }
+        }
+
+        // Game loop
+        let lastTime = Date.now();
+        function gameLoop() {
+            if (!gameState.gameRunning) return;
+
+            const currentTime = Date.now();
+            const deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+
+            movePlayer();
+            checkCollisions();
+            increaseDifficulty(deltaTime);
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Game over
+        function gameOver() {
+            gameState.gameRunning = false;
+            finalScoreDisplay.textContent = gameState.score;
+            gameOverModal.style.display = 'block';
+        }
+
+        // Reset game
+        function resetGame() {
+            // Clear all entities
+            gameState.entities.forEach(entity => {
+                if (entity.element && entity.element.parentNode) {
+                    entity.element.remove();
+                }
+            });
+
+            // Reset state
+            gameState.score = 0;
+            gameState.lives = 3;
+            gameState.playerX = 380;
+            gameState.gameRunning = true;
+            gameState.entities = [];
+            gameState.entityIdCounter = 0;
+            gameState.candySpeed = 3;
+            gameState.enemySpeed = 2.5;
+            gameState.spawnInterval = 1500;
+            gameState.difficultyTimer = 0;
+
+            // Update display
+            updateScore();
+            updateLives();
+            updatePlayerPosition();
+            gameOverModal.style.display = 'none';
+
+            // Restart game loop
+            lastTime = Date.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Play again button
+        playAgainBtn.addEventListener('click', resetGame);
+
+        // Start game
+        init();
+    </script>
+</body>
+</html>
