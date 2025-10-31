@@ -195,8 +195,8 @@
             entities: [],
             entityIdCounter: 0,
             spawnInterval: 1500,  // milliseconds between spawns
-            candySpeed: 3,
-            enemySpeed: 2.5,
+            candySpeed: 5,
+            enemySpeed: 4,
             difficultyTimer: 0
         };
 
@@ -280,8 +280,8 @@
 
             // Set animation duration based on speed
             const duration = isCandy ?
-                (700 / gameState.candySpeed) :
-                (700 / gameState.enemySpeed);
+                (10 / gameState.candySpeed) :
+                (10 / gameState.enemySpeed);
             div.style.animationDuration = duration + 's';
 
             gameContainer.appendChild(div);
@@ -428,8 +428,8 @@
             gameState.gameRunning = true;
             gameState.entities = [];
             gameState.entityIdCounter = 0;
-            gameState.candySpeed = 3;
-            gameState.enemySpeed = 2.5;
+            gameState.candySpeed = 5;
+            gameState.enemySpeed = 4;
             gameState.spawnInterval = 1500;
             gameState.difficultyTimer = 0;
 
